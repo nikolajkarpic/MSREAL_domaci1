@@ -1,10 +1,10 @@
-ifneq (&(KERNELRELEASE),)
+ifneq ($(KERNELRELEASE),)
 	obj-m := fifo.o
 else
 all:
-	&(MAKE) -C /lib/modules/`uname -r`/build M=`pwd` modules
+	$(MAKE) -C /lib/modules/`uname -r`/build M=`pwd` modules
 	gcc fifo_app.c -o fifo_app.out
 clean:
-	&(MAKE) -C /lib/modules/`uname -r`/build M=`pwd` clean
+	$(MAKE) -C /lib/modules/`uname -r`/build M=`pwd` clean
 	rm -f *~ *.out
 endif
