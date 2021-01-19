@@ -118,7 +118,7 @@ ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 
             for (j = 0; j < 15; j++)
             {
-                fifo_buffer[i] = fifo_buffer[i + 1];
+                fifo_buffer[j] = fifo_buffer[j + 1];
             }
             fifo_buffer[15] = -1;
         }
@@ -193,8 +193,7 @@ ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length,
             break;
     }
 
-    wake_up_interruptible(&readQueue);
-    kfree(input); //
+    kfree(input); 
     return length;
 }
 
