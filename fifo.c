@@ -16,7 +16,7 @@ int fifo_buffer[16];
 int position = 0;
 int temp_vrednost = 1;
 
-struct semaphore sem;
+//struct semaphore sem;
 
 dev_t dev_id;
 static struct class *dev_class;
@@ -41,9 +41,6 @@ struct file_operations fifo_ops = {
 
 static int __init fifo_init(void)
 {
-
-    sema_init(&sem, 1); // pokusaj odma semafore.
-
     if (alloc_chrdev_region(&dev_id, 0, 1, "fifo"))
     {
         printk(KERN_ERR "Ne moze da registruje device!\n");
@@ -128,8 +125,86 @@ ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 
         ret = copy_to_user(buffer, output, len * temp_vrednost);
         if (ret)
+        {
             return -EFAULT;
+        }
         printk(KERN_INFO "Citaj iz fifo!\n");
     }
     return len * temp_vrednost;
 }
+
+ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset)
+{
+    char *input = (char *)kmalloc(length, GFP_KERNEL);
+    char *inputCopy;
+    char trimmed[5];
+    int toBuffer;
+
+    if (copy_from_user(input, buffer, length))
+    {
+        return -EFAULT;
+    }
+    input[length - 1] = '\0';
+    inputCopy = input;
+
+    strncpy(trimmed, inputCopy, 4);
+    trimmed[4] = '\0';
+    if ((inputCopy[4] != '\0') && (inputCopy[4] != ';') && (strncmp(trimmed, "num=", 4) != 0))
+    {
+        printk(KERN_ERR "Ocekivan heksadecimal format (0x??)");
+        return length;
+    }
+    else if (strncmp(trimmed, "num=", 4) == 0)
+    {
+        strsep(&inputCopy, "=");
+        kstrtoint(inputCopy, 10, &temp_vrednost);
+
+        return length;
+    }
+
+    while (1)
+    {
+        strncpy(trimmed, inputCopy, 4);
+        trimmed[4] = '\0';
+        if (kstrtoint(trimmed, 0, &toBuffer) != 0)
+        {
+            printk(KERN_ERR "%s primmljeno. Ocekivaj heksadecimalan format: 0x??;0x??;0x??..(16) maksimalne vrednosti 0xFF (2)", trimmed);
+            return length;
+        }
+        else if (toBuffer > 255 || toBuffer < 0)
+        {
+            printk(KERN_ERR "vrednost veca od 0xFF!");
+            return length;
+        }
+        while (position > 15)
+        {
+            printk(KERN_WARNING "Fifo pun, ceka....\n");
+        }
+
+        if (position < 16)
+        {
+            fifo_buffer[position] = toBuffer;
+            position++;
+            printk(KERN_INFO "Upisano %d u fifo", toBuffer);
+        }
+        if (inputCopy[4] == '\0')
+            break;
+        if (strsep(&inputCopy, ";") == NULL)
+            break;
+    }
+
+    wake_up_interruptible(&readQueue);
+    kfree(input); //
+    return length;
+}
+
+static void __exit fifo_exit(void){                                                                      
+  cdev_del(fifo_cdev);
+  device_destroy(dev_class, dev_id);
+  class_destroy(dev_class);
+  unregister_chrdev_region(dev_id, 1);
+  printk(KERN_INFO "Fifo unloaded!\n");
+}
+
+module_init(fifo_init);
+module_exit(fifo_exit);
