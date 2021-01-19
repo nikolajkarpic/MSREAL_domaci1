@@ -13,6 +13,8 @@ MODULE_AUTHOR("nikolajkarpic");
 MODULE_DESCRIPTION("Fifo");
 
 int fifo_buffer[16];
+int position = 0;
+int temp_vrednost = 1;
 
 struct semaphore sem;
 
@@ -21,19 +23,13 @@ static struct class *dev_class;
 static struct device *fifo_device;
 static struct cdev *fifo_cdev;
 
-
-
 DECLARE_WAIT_QUEUE_HEAD(readQueue);
 DECLARE_WAIT_QUEUE_HEAD(writeQueue);
-
-
 
 int file_open(struct inode *pinode, struct file *pfile);
 int file_close(struct inode *pinode, struct file *pfile);
 ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset);
 ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset);
-
-
 
 struct file_operations fifo_ops = {
     .owner = THIS_MODULE,
@@ -43,11 +39,10 @@ struct file_operations fifo_ops = {
     .release = file_close,
 };
 
-
 static int __init fifo_init(void)
 {
 
-    sema_init(&sem,1); // pokusaj odma semafore.
+    sema_init(&sem, 1); // pokusaj odma semafore.
 
     if (alloc_chrdev_region(&dev_id, 0, 1, "fifo"))
     {
@@ -96,21 +91,45 @@ fail_2:
     return -1;
 }
 
-int file_open(struct inode *pinode, struct file *pfile){                                                      
-		printk(KERN_INFO "Otvorio fajl\n");
-		return 0;
+int file_open(struct inode *pinode, struct file *pfile)
+{
+    printk(KERN_INFO "Otvorio fajl\n");
+    return 0;
 }
 
-int file_close(struct inode *pinode, struct file *pfile){
-		printk(KERN_INFO "Zatvorio fajl\n");
-		return 0;
+int file_close(struct inode *pinode, struct file *pfile)
+{
+    printk(KERN_INFO "Zatvorio fajl\n");
+    return 0;
 }
 
-ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset){
+ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
+{
     long int len = 0;
     char output[100];
     int ret;
     int i;
     int j;
     output[0] = '\0';
+    if (position > (temp_vrednost - 1))
+    {
+
+        position = position - temp_vrednost;
+        for (i = 0; i < temp_vrednost; i++)
+        {
+            len = snprintf(output + strlen(output), 100, "%#04x ", fifo_buffer[0]);
+
+            for (j = 0; j < 15; j++)
+            {
+                fifo_buffer[i] = fifo_buffer[i + 1];
+            }
+            fifo_buffer[15] = -1;
+        }
+
+        ret = copy_to_user(buffer, output, len * temp_vrednost);
+        if (ret)
+            return -EFAULT;
+        printk(KERN_INFO "Citaj iz fifo!\n");
+    }
+    return len * temp_vrednost;
 }
