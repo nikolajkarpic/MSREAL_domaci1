@@ -7,6 +7,7 @@
 #include <linux/device.h>
 #include <linux/wait.h>
 #include <linux/slab.h>
+#include <linux/uaccess.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("nikolajkarpic");
@@ -103,7 +104,7 @@ int file_close(struct inode *pinode, struct file *pfile)
 ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
 {
     long int len = 0;
-    char output[100];
+    char output[80];
     int ret;
     int i;
     int j;
@@ -114,7 +115,7 @@ ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
         position = position - temp_vrednost;
         for (i = 0; i < temp_vrednost; i++)
         {
-            len = snprintf(output + strlen(output), 100, "%#04x ", fifo_buffer[0]);
+            len = snprintf(output + strlen(output), 80, "%#04x ", fifo_buffer[0]);
 
             for (j = 0; j < 15; j++)
             {
@@ -123,14 +124,14 @@ ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
             fifo_buffer[15] = -1;
         }
 
-        ret = copy_to_user(buffer, output, len * temp_vrednost);
+        ret = copy_to_user(buffer, output, len*temp_vrednost);
         if (ret)
         {
             return -EFAULT;
         }
         printk(KERN_INFO "Citaj iz fifo!\n");
     }
-    return len * temp_vrednost;
+    return len*temp_vrednost;
 }
 
 ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset)
